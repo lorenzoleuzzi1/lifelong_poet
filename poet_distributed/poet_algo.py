@@ -18,7 +18,6 @@ import logging
 logger = logging.getLogger(__name__)
 import numpy as np
 from poet_distributed.es import ESOptimizer
-from poet_distributed.es import initialize_worker_fiber
 from collections import OrderedDict
 from poet_distributed.niches.box2d.env import Env_config
 from poet_distributed.reproduce_ops import Reproducer
@@ -153,7 +152,7 @@ class MultiESOptimizer:
         Creates a new optimizer/niche and adds it to the registry.
         """
         optimizer = self.create_optimizer(env, task, seed, created_at, model_params)
-        optim_id = ray.get(optimizer.optim_id.remote())  # Retrieve ID from Ray actor
+        optim_id = ray.get(optimizer.get_optim_id.remote())  # Retrieve ID from Ray actor
         
         self.optimizers[optim_id] = optimizer
 
@@ -185,9 +184,10 @@ class MultiESOptimizer:
 
         # Wait for results and process them
         results = ray.get(tasks)
-
-        for optimizer, (theta, stats) in zip(self.optimizers.values(), results):
+        print(results)
+        for optimizer, result in zip(self.optimizers.values(), results):
             # Evaluate new theta
+            
             self_eval_task = optimizer.start_theta_eval.remote(theta)
             self_eval_stats = ray.get(optimizer.get_theta_eval.remote(self_eval_task))
 
@@ -368,7 +368,7 @@ class MultiESOptimizer:
                                     max_num_envs=self.args.max_num_envs)
 
             for o in self.optimizers.values():
-                o.clean_dicts_before_iter()
+                o.clean_dicts_before_iter.remote()
 
             self.ind_es_step(iteration=iteration)
 
@@ -379,4 +379,4 @@ class MultiESOptimizer:
 
             if iteration % steps_before_transfer == 0:
                 for o in self.optimizers.values():
-                    o.save_to_logger(iteration)
+                    o.save_to_logger(iteration).remote()
