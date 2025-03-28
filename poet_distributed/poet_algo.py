@@ -24,7 +24,6 @@ from poet_distributed.niches.box2d.env import Env_config
 from poet_distributed.reproduce_ops import Reproducer
 from poet_distributed.novelty import compute_novelty_vs_archive
 import json
-import ray
 
 
 def construct_niche_fns_from_env(args, env, task, seed):
@@ -51,18 +50,27 @@ class MultiESOptimizer:
 
         self.args = args
 
-        # Ray shared storage (distributed dictionary)
-        self.ray_shared = {
-            "niches": ray.put({}),
-            "thetas": ray.put({}),
-            "noise": ray.put({})
+        import fiber as mp
+
+        mp_ctx = mp.get_context('spawn')
+        manager = mp_ctx.Manager()
+        self.manager = manager
+        self.fiber_shared = {
+                "niches": manager.dict(),
+                "thetas": manager.dict(),
         }
+        self.fiber_pool = mp_ctx.Pool(args.num_workers, initializer=initialize_worker_fiber,
+                initargs=(self.fiber_shared["thetas"],
+                    self.fiber_shared["niches"]))
+        # print n worker of pool
+        print("Number of workers in pool: ", self.fiber_pool._processes)
         self.env_registry = OrderedDict()
         self.env_archive = OrderedDict()
         self.env_reproducer = Reproducer(args)
         self.optimizers = OrderedDict()
-
+        
         self.task = args.task
+
         if args.start_from:
             logger.debug("args.start_from {}".format(args.start_from))
             with open(args.start_from) as f:
@@ -121,10 +129,10 @@ class MultiESOptimizer:
             theta=niche.initial_theta()
         assert optim_id not in self.optimizers.keys()
 
-        # Create the optimizer as a Ray actor (remotely managed)
-        optimizer = ESOptimizer.remote(
+        return ESOptimizer(
             optim_id=optim_id,
-            ray_shared=self.ray_shared,
+            fiber_pool=self.fiber_pool,
+            fiber_shared=self.fiber_shared,
             theta=theta,
             make_niche=niche_fn,
             learning_rate=self.args.learning_rate,
@@ -142,30 +150,27 @@ class MultiESOptimizer:
             noise_limit=self.args.noise_limit,
             log_file=self.args.log_file,
             created_at=created_at,
-            is_candidate=is_candidate
-        )
-
-        return optimizer
+            is_candidate=is_candidate)
 
 
     def add_optimizer(self, env, task, seed, created_at=0, model_params=None):
-        """
-        Creates a new optimizer/niche and adds it to the registry.
-        """
-        optimizer = self.create_optimizer(env, task, seed, created_at, model_params)
-        optim_id = ray.get(optimizer.optim_id.remote())  # Retrieve ID from Ray actor
-        
-        self.optimizers[optim_id] = optimizer
+        '''
+            creat a new optimizer/niche
+            created_at: the iteration when this niche is created
+        '''
+        o = self.create_optimizer(env, task, seed, created_at, model_params)
+        optim_id = o.optim_id
+        self.optimizers[optim_id] = o
 
         assert optim_id not in self.env_registry.keys()
         assert optim_id not in self.env_archive.keys()
         self.env_registry[optim_id] = env
         self.env_archive[optim_id] = env
-        # Dump environment config to JSON
+        #dump the env
         log_file = self.args.log_file
         env_config_file = log_file + '/' + log_file.split('/')[-1] + '.' + optim_id + '.env.json'
         record = {'config': env._asdict(), 'seed': seed, 'task': task}
-        with open(env_config_file, 'w') as f:
+        with open(env_config_file,'w') as f:
             json.dump(record, f)
 
     def delete_optimizer(self, optim_id):
@@ -178,25 +183,20 @@ class MultiESOptimizer:
         logger.info('DELETED {} '.format(optim_id))
 
     def ind_es_step(self, iteration):
-        """Runs an ES step in parallel using Ray for all optimizers."""
-        
-        # Start step computations asynchronously
-        tasks = [optimizer.start_step.remote() for optimizer in self.optimizers.values()]
+        tasks = [o.start_step() for o in self.optimizers.values()]
 
-        # Wait for results and process them
-        results = ray.get(tasks)
+        for optimizer, task in zip(self.optimizers.values(), tasks):
 
-        for optimizer, (theta, stats) in zip(self.optimizers.values(), results):
-            # Evaluate new theta
-            self_eval_task = optimizer.start_theta_eval.remote(theta)
-            self_eval_stats = ray.get(optimizer.get_theta_eval.remote(self_eval_task))
+            optimizer.theta, stats = optimizer.get_step(task)
+            self_eval_task = optimizer.start_theta_eval(optimizer.theta)
+            self_eval_stats = optimizer.get_theta_eval(self_eval_task)
 
-            logger.info(f'Iter={iteration} Optimizer {ray.get(optimizer.optim_id)} '
-                        f'theta_mean {self_eval_stats.eval_returns_mean} '
-                        f'best po {stats.po_returns_max} iteration spent {iteration - ray.get(optimizer.created_at)}')
+            logger.info('Iter={} Optimizer {} theta_mean {} best po {} iteration spent {}'.format(
+                iteration, optimizer.optim_id, self_eval_stats.eval_returns_mean,
+                stats.po_returns_max, iteration - optimizer.created_at))
 
-            # Update optimizer
-            optimizer.update_dicts_after_es.remote(stats=stats, self_eval_stats=self_eval_stats)
+            optimizer.update_dicts_after_es(stats=stats,
+                self_eval_stats=self_eval_stats)
 
     def transfer(self, propose_with_adam, checkpointing, reset_optimizer):
         logger.info('Computing direct transfers...')
@@ -332,7 +332,7 @@ class MultiESOptimizer:
             for child in child_list:
                 new_env_config, seed, _, _ = child
                 # targeted transfer
-                o = self.create_optimizer(new_env_config, seed, is_candidate=True)
+                o = self.create_optimizer(new_env_config, self.task, seed, is_candidate=True)
                 score_child, theta_child = o.evaluate_transfer(self.optimizers)
                 del o
                 if self.pass_mc(score_child):  # check mc
