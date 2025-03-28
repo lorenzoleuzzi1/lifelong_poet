@@ -21,7 +21,6 @@ import numpy as np
 from poet_distributed.es import initialize_master_fiber
 from poet_distributed.poet_algo import MultiESOptimizer
 import json
-import ray
 import os
 
 DEFAULT_TASK = {
@@ -34,8 +33,6 @@ DEFAULT_TASK = {
 
 def run_main(args):
 
-    ray.init(address=os.environ["ip_head"])
-
     #set master_seed
     np.random.seed(args.master_seed)
 
@@ -46,8 +43,7 @@ def run_main(args):
                        reset_optimizer=True,
                        checkpointing=args.checkpointing,
                        steps_before_transfer=args.steps_before_transfer)
-    ray.shutdown()
-
+    
 def main():
     parser = ArgumentParser()
     parser.add_argument('log_file')
