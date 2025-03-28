@@ -170,6 +170,7 @@ class BipedalWalkerCustom(gym.Env):
         self.config = env_config
 
     def set_task(self, task_config):
+        # print("task_config", task_config)
         # If not set, use default values
         if "motors_torque" not in task_config:
             task_config["motors_torque"] = MOTORS_TORQUE
@@ -265,9 +266,9 @@ class BipedalWalkerCustom(gym.Env):
 
             elif state == self.PIT and oneshot:
                 # input parameter: pit_gap
-                # pit_gap = self.np_random.randint(3, 5) #counter is the control of the GAP distance
+                # pit_gap = self.np_random.integers(3, 5) #counter is the control of the GAP distance
                 #counter = pit_gap
-                #counter = self.np_random.randint(*self.config.pit_gap)
+                #counter = self.np_random.integers(*self.config.pit_gap)
                 pit_gap = 1.0 + self.np_random.uniform(*self.config.pit_gap)
                 counter = np.ceil(pit_gap)
                 pit_diff = counter - pit_gap
@@ -304,10 +305,10 @@ class BipedalWalkerCustom(gym.Env):
             elif state == self.STUMP and oneshot:
                 # input parameter stump_width, stump_height, stump_float
                 #stump_width = self.np_random.uniform(*self.config.stump_width)
-                stump_width = self.np_random.randint(*self.config.stump_width)
+                stump_width = self.np_random.integers(*self.config.stump_width)
                 stump_height = self.np_random.uniform(
                     *self.config.stump_height)
-                stump_float = self.np_random.randint(*self.config.stump_float)
+                stump_float = self.np_random.integers(*self.config.stump_float)
                 #counter = np.ceil(stump_width)
                 counter = stump_width
                 countery = stump_height
@@ -330,8 +331,8 @@ class BipedalWalkerCustom(gym.Env):
                 stair_height = self.np_random.uniform(
                     *self.config.stair_height)
                 stair_slope = 1 if self.np_random.rand() > 0.5 else -1
-                stair_width = self.np_random.randint(*self.config.stair_width)
-                stair_steps = self.np_random.randint(*self.config.stair_steps)
+                stair_width = self.np_random.integers(*self.config.stair_width)
+                stair_steps = self.np_random.integers(*self.config.stair_steps)
                 original_y = y
                 for s in range(stair_steps):
                     poly = [
@@ -361,10 +362,10 @@ class BipedalWalkerCustom(gym.Env):
             self.terrain_y.append(y)
             counter -= 1
             if counter == 0:
-                counter = self.np_random.randint(
+                counter = self.np_random.integers(
                     TERRAIN_GRASS / 2, TERRAIN_GRASS)
                 if state == self.GRASS and hardcore:
-                    state = self.np_random.randint(1, self._STATES_)
+                    state = self.np_random.integers(1, self._STATES_)
                     oneshot = True
                 else:
                     state = self.GRASS
