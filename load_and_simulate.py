@@ -20,16 +20,16 @@ DEFAULT_ENV = Env_config(
         stair_width=[],
         stair_steps=[])
 
-folder = "pts"
+folder = "logs"
 
-name_exp_1 = "poet_task_search_2"
+name_exp_1 = "lifelong_poet_task_1"
 terrain_1 = "flat"
-path_1 = f"/Users/lorenzoleuzzi/Desktop/poet_logs/{folder}/{name_exp_1}/"
+path_1 = f"/home/n.pitzalis/logs/lifelong_poet_task_1/"
 
 
-name_exp_2 = "poet_default"
+name_exp_2 = "lifelong_poet_task_2"
 terrain_2 = "r1.5.p0.0_1.2.b1_0.2_0.6"
-path_2 = f"/Users/lorenzoleuzzi/Desktop/poet_logs/{folder}/{name_exp_2}/"
+path_2 = f"/home/n.pitzalis/logs/lifelong_poet_task_2/"
 
 # Load env config from json
 path_config = path_1 + f"{name_exp_1}.{terrain_1}.env.json" # "/Users/lorenzoleuzzi/logs/poet_a/poet_a.flat.env.json" # path_1 + f"poet_{name_exp_1}.{terrain_1}.env.json"
@@ -40,7 +40,7 @@ print(env_config_json)
 env_config = Env_config(**env_config_json["config"])
 if "task" in env_config_json:
     task = env_config_json["task"]
-path_model = path_2 + f"{name_exp_2}.{terrain_2}.best.json" # "/Users/lorenzoleuzzi/logs/poet_a/poet_a.flat.best.json" # path_2 + f"poet_{name_exp_2}.{terrain_2}.best.json"
+path_model = path_1 + f"{name_exp_1}.{terrain_1}.best.json" # "/Users/lorenzoleuzzi/logs/poet_a/poet_a.flat.best.json" # path_2 + f"poet_{name_exp_2}.{terrain_2}.best.json"
 
 
 Game = namedtuple('Game', ['env_name', 'time_factor', 'input_size',

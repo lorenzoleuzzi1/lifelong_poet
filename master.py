@@ -23,7 +23,7 @@ from poet_distributed.poet_algo import MultiESOptimizer
 import json
 
 DEFAULT_TASK = {
-    "motor_torque" : 80,
+    "motors_torque" : 80,
     "speed_hip": 4,
     "speed_knee": 6,
     "leg_w" : 8,
@@ -83,10 +83,12 @@ def main():
     # Check task dictionary
     if not isinstance(args.task, dict):
         raise ValueError("Task must be a dictionary")
-    for t in DEFAULT_TASK:
-        if t not in args.task:
-            args.task[t] = DEFAULT_TASK[t]  # Add default values
     
+    if args.start_from is None:
+        for t in DEFAULT_TASK:
+            if t not in args.task:
+                args.task[t] = DEFAULT_TASK[t]  # Add default values
+        
     logger.info(args)
 
     run_main(args)

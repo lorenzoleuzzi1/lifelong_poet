@@ -68,9 +68,7 @@ class MultiESOptimizer:
         self.env_archive = OrderedDict()
         self.env_reproducer = Reproducer(args)
         self.optimizers = OrderedDict()
-        
-        self.task = args.task
-
+    
         if args.start_from:
             logger.debug("args.start_from {}".format(args.start_from))
             with open(args.start_from) as f:
@@ -102,6 +100,8 @@ class MultiESOptimizer:
                 seed = exp['seed']
                 self.add_optimizer(env=env, task=args.task, seed=seed, model_params=model_params)
 
+                self.task = exp['task']
+
         else:
             env = Env_config(
                 name='flat',
@@ -115,6 +115,8 @@ class MultiESOptimizer:
                 stair_steps=[])
 
             self.add_optimizer(env=env, task=args.task, seed=args.master_seed)
+
+            self.task = args.task
 
     def create_optimizer(self, env, task, seed, created_at=0, model_params=None, is_candidate=False):
 
